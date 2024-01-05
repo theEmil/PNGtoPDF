@@ -1,6 +1,7 @@
 import os
 import time
 from PIL import Image
+import multiprocessing
 from multiprocessing import Pool
 
 
@@ -23,7 +24,7 @@ def convertImagesMultiThread(folder_path: str, loud = False) -> None:
     num_files = 0
     num_updated= 0
     num_converted = 0
-    numthreads = 32
+    numthreads = multiprocessing.cpu_count()
     pool = Pool(numthreads)
     queue = []
 
