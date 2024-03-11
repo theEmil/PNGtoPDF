@@ -1,6 +1,6 @@
 import os
 import time
-from PIL import Image
+from PIL import ImageFile, Image
 import multiprocessing
 from multiprocessing import Pool
 
@@ -8,18 +8,23 @@ from multiprocessing import Pool
 def convert(image_path, pdf_path):
 
     ########### Bild zu PDF konvertieren
-    with Image.open(image_path) as rgba:
-        if len(rgba.split()) == 4:
-            rgb = Image.new("RGB", rgba.size, (255, 255, 255))
-            rgb.paste(rgba, mask=rgba.split()[3])
-            rgb.save(pdf_path, "PDF", resolution=50.0)
-        else:
-            rgba.save(pdf_path, "PDF", resolution=50.0)
+    try:
+        with Image.open(image_path) as rgba:
+            if len(rgba.split()) == 4:
+                rgb = Image.new("RGB", rgba.size, (255, 255, 255))
+                rgb.paste(rgba, mask=rgba.split()[3])
+                rgb.save(pdf_path, "PDF", resolution=50.0)
+            else:
+                rgba.save(pdf_path, "PDF", resolution=50.0)
+    except Exception as e:
+        print("Error while converting " + image_path + " to .pdf: " + str(e))
+        print("Skipping this file")
+        return
 
 def convertImagesMultiThread(folder_path: str, loud = False) -> None:
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
 
     print("Converting all .png Images in Path "  + folder_path + " to .pdf-Files...")
-    
     ########### Variablen initialisieren
     num_files = 0
     num_updated= 0
@@ -27,17 +32,13 @@ def convertImagesMultiThread(folder_path: str, loud = False) -> None:
     numthreads = multiprocessing.cpu_count()
     pool = Pool(numthreads)
     queue = []
-
-
     ########### alle Unterordner durchsuchen
     for root, dirs, files in os.walk(folder_path):
         for file in files:
             if file.lower().endswith(".png") or file.lower().endswith(".jpg"):
-                
                 num_files += 1
                 image_path = os.path.join(root, file)
                 pdf_path = os.path.splitext(image_path)[0] + ".pdf"
-                
                 if os.path.exists(pdf_path) and os.path.getmtime(image_path) <= os.path.getmtime(pdf_path):
                     if loud:
                         print("File " + file + " has not been changed since last conversion")
@@ -50,27 +51,24 @@ def convertImagesMultiThread(folder_path: str, loud = False) -> None:
                         break
                     else:
                         time.sleep(0.1)
-
                 ########### Nächstes Bild in die "Warteschlange" hinzufügen
-                        
                 if  os.path.exists(pdf_path) and os.path.getmtime(image_path) > os.path.getmtime(pdf_path):
                     num_updated += 1
                     print("Updating File " + file)
                     t = pool.apply_async(convert, args=(image_path, pdf_path))
                     queue.append(t)
-                    
                 else:
                     num_converted += 1
                     print("Converting File " + file + " to .pdf")
                     t = pool.apply_async(convert, args=(image_path, pdf_path))
                     queue.append(t)
-
     ########### Warten bis Warteschlange leer ist               
     for t in queue:
         t.get()                       
     print("Found " + str(num_files) + ", updated " + str(num_updated) + " and converted " + str(num_converted) + " to .pdf-Files")
 
 def convertImagesToPDF(folder_path: str, loud = False) -> None:
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
 
     print("Converting all .png Images in Path "  + folder_path + " to .pdf-Files...")
     
